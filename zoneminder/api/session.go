@@ -3,12 +3,13 @@ package api
 import "time"
 
 type LoginSession struct {
-	Details       LoginDetails
-	LatestRefresh time.Time
+	Details     LoginDetails
+	Created     time.Time
+	LastRefresh time.Time
 }
 
 func (s *LoginSession) Refresh(details LoginDetails) {
-	s.LatestRefresh = time.Now()
+	s.LastRefresh = time.Now()
 
 	s.Details.Credentials = details.Credentials
 	s.Details.AccessToken = details.AccessToken
@@ -16,9 +17,9 @@ func (s *LoginSession) Refresh(details LoginDetails) {
 }
 
 func (s LoginSession) RefreshRequired() bool {
-	return time.Now().Sub(s.LatestRefresh).Seconds() > s.Details.AccessTokenExpires
+	return time.Now().Sub(s.LastRefresh).Seconds() > s.Details.AccessTokenExpires
 }
 
-func (s LoginSession) CanRefresh() bool {
-	return time.Now().Sub(s.LatestRefresh).Seconds() < s.Details.RefreshTokenExpires
+func (s LoginSession) Expired() bool {
+	return time.Now().Sub(s.Created).Seconds() > s.Details.RefreshTokenExpires
 }

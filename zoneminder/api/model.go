@@ -8,6 +8,11 @@ import (
 	"github.com/zinic/forculus/zoneminder/constants"
 )
 
+type AlertedMonitor struct {
+	Monitor     Monitor
+	AlarmStatus AlarmStatus
+}
+
 type LoginCredentials struct {
 	Username string
 	Password string

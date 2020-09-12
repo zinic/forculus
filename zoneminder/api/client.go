@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/zinic/forculus/log"
-
 	"github.com/zinic/forculus/zoneminder/constants"
 	"golang.org/x/net/html"
 )
@@ -41,7 +39,7 @@ func (s Endpoint) Format(path ...string) string {
 func (s Endpoint) FormatQuery(query url.Values, path ...string) string {
 	formattedURL := s.Format(path...)
 
-	if query != nil {
+	if query != nil && len(query) > 0 {
 		formattedURL = fmt.Sprintf("%s?%s", formattedURL, query.Encode())
 	}
 
@@ -50,6 +48,7 @@ func (s Endpoint) FormatQuery(query url.Values, path ...string) string {
 
 type Client interface {
 	Login() error
+	LoginSession() LoginSession
 	RefreshLogin() error
 	Monitors() (MonitorList, error)
 	ExportEvent(event MonitorEvent) (io.ReadCloser, error)
@@ -93,7 +92,7 @@ func (s *client) doRequest(method string, body io.Reader, query url.Values, head
 		queryCopy.Set("token", s.loginSession.Details.AccessToken)
 	}
 
-	log.Debugf("Making %s API call to endpoint: %s", method, s.endpoint.FormatQuery(queryCopy, path...))
+	//log.Debugf("Making %s API call to endpoint: %s", method, s.endpoint.FormatQuery(queryCopy, path...))
 
 	if req, err := http.NewRequest(method, s.endpoint.FormatQuery(queryCopy, path...), body); err != nil {
 		return nil, err
@@ -116,63 +115,15 @@ func (s *client) checkLogin() error {
 		return s.Login()
 	}
 
+	if s.loginSession.Expired() {
+		return s.Login()
+	}
+
 	if s.loginSession.RefreshRequired() {
-		if s.loginSession.CanRefresh() {
-			return s.RefreshLogin()
-		} else {
-			return s.Login()
-		}
+		return s.RefreshLogin()
 	}
 
 	return nil
-}
-
-type AlertedMonitor struct {
-	Monitor     Monitor
-	AlarmStatus AlarmStatus
-}
-
-func FindNodeAttrByKey(node *html.Node, key string) (html.Attribute, bool) {
-	for _, attr := range node.Attr {
-		if strings.ToLower(attr.Key) == key {
-			return attr, true
-		}
-	}
-
-	return html.Attribute{}, false
-}
-
-func ExtractCSRFToken(root *html.Node) (string, bool) {
-	depthStack := []*html.Node{
-		root,
-	}
-
-	for len(depthStack) > 0 {
-		nextIdx := len(depthStack) - 1
-		nextNode := depthStack[nextIdx]
-		depthStack = depthStack[:nextIdx]
-
-		if nextNode.Data == "input" {
-			if nameAttr, hasName := FindNodeAttrByKey(nextNode, "name"); hasName {
-				if strings.ToLower(nameAttr.Val) == constants.CSRFMagicName {
-					if valueAttr, hasValue := FindNodeAttrByKey(nextNode, "value"); hasValue {
-						return valueAttr.Val, true
-					}
-				}
-			}
-		}
-
-		if nextNode.FirstChild != nil {
-			childCursor := nextNode.FirstChild
-
-			for childCursor != nil {
-				depthStack = append(depthStack, childCursor)
-				childCursor = childCursor.NextSibling
-			}
-		}
-	}
-
-	return "", false
 }
 
 func (s *client) exportEventCSRF(event MonitorEvent) (string, error) {
@@ -196,7 +147,15 @@ func (s *client) exportEventCSRF(event MonitorEvent) (string, error) {
 	}
 }
 
+func (s *client) LoginSession() LoginSession {
+	return *s.loginSession
+}
+
 func (s *client) ExportEvent(event MonitorEvent) (io.ReadCloser, error) {
+	if err := s.checkLogin(); err != nil {
+		return nil, err
+	}
+
 	var (
 		connKey = strconv.Itoa(rand.Int() % 1000000)
 		form    = url.Values{
@@ -222,10 +181,6 @@ func (s *client) ExportEvent(event MonitorEvent) (io.ReadCloser, error) {
 
 		exportEventResult ExportEventResult
 	)
-
-	if err := s.checkLogin(); err != nil {
-		return nil, err
-	}
 
 	// Gross...
 	if csrfToken, err := s.exportEventCSRF(event); err != nil {
@@ -545,14 +500,16 @@ func (s *client) Login() error {
 			return fmt.Errorf("request failed with response code %s", resp.Status)
 		}
 
+		now := time.Now()
 		if content, err := ioutil.ReadAll(resp.Body); err != nil {
 			return err
 		} else if err := json.Unmarshal(content, &loginDetails); err != nil {
 			return err
 		} else {
 			s.loginSession = &LoginSession{
-				Details:       loginDetails,
-				LatestRefresh: time.Now(),
+				Details:     loginDetails,
+				Created:     now,
+				LastRefresh: now,
 			}
 		}
 	}

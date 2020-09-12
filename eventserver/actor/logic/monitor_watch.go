@@ -4,9 +4,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/zinic/forculus/actor"
+	"github.com/zinic/forculus/eventserver/actor"
 
-	"github.com/zinic/forculus/event"
+	"github.com/zinic/forculus/eventserver/event"
 
 	"github.com/zinic/forculus/log"
 

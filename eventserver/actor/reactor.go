@@ -3,7 +3,7 @@ package actor
 import (
 	"sync"
 
-	"github.com/zinic/forculus/event"
+	"github.com/zinic/forculus/eventserver/event"
 )
 
 type subscription struct {

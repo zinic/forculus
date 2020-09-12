@@ -3,17 +3,18 @@ package logic
 import (
 	"fmt"
 
-	"github.com/zinic/forculus/actor"
+	"github.com/zinic/forculus/eventserver/actor"
 
 	"github.com/zinic/forculus/config"
-	"github.com/zinic/forculus/email"
-	"github.com/zinic/forculus/event"
+	"github.com/zinic/forculus/eventserver/email"
+	"github.com/zinic/forculus/eventserver/event"
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/zoneminder/api"
 )
 
-func RegisterEmailer(reactor actor.Reactor, alert config.EmailAlert, server config.SMTPServer) {
+func RegisterEmailer(reactor actor.Reactor, name string, alert config.EmailAlert, server config.SMTPServer) {
 	emailSender := EventEmailSender{
+		name:   name,
 		alert:  alert,
 		server: server,
 	}
@@ -22,6 +23,7 @@ func RegisterEmailer(reactor actor.Reactor, alert config.EmailAlert, server conf
 }
 
 type EventEmailSender struct {
+	name   string
 	alert  config.EmailAlert
 	server config.SMTPServer
 }
@@ -42,22 +44,22 @@ func (s *EventEmailSender) handleEvent(nextEvent event.Event) {
 
 		if s.alert.Filter.NameRegex != nil && !s.alert.Filter.NameRegex.MatchString(alertedMonitor.Monitor.Details.Name) {
 			log.Debugf("Alerted monitor %s did not match alert %s regex %s",
-				alertedMonitor.Monitor.Details.Name, s.alert.Name, s.alert.Filter.NameRegex)
+				alertedMonitor.Monitor.Details.Name, s.name, s.alert.Filter.NameRegex)
 			return
 		}
 
 		body := fmt.Sprintf("Monitor %s has become alerted.", alertedMonitor.Monitor.Name())
 		if err := email.Send(body, s.alert, s.server); err != nil {
-			log.Errorf("Failed sending email for alert %s: %v", s.alert.Name, err)
+			log.Errorf("Failed sending email for alert %s: %v", s.name, err)
 		} else {
-			log.Infof("Email alert %s triggered", s.alert.Name)
+			log.Infof("Email alert %s triggered", s.name)
 		}
 
 	case event.NewMonitorEvent:
 		monitorEvent := nextEvent.Payload.(api.MonitorEvent)
 		if s.alert.Filter.NameRegex != nil && !s.alert.Filter.NameRegex.MatchString(monitorEvent.Name) {
 			log.Debugf("Monitor event %s did not match alert %s regex %s",
-				monitorEvent.Name, s.alert.Name, s.alert.Filter.NameRegex)
+				monitorEvent.Name, s.name, s.alert.Filter.NameRegex)
 			return
 		}
 
@@ -69,9 +71,9 @@ func (s *EventEmailSender) handleEvent(nextEvent event.Event) {
 
 		body := fmt.Sprintf("A new monitor event %s has become available.", monitorEvent.Name)
 		if err := email.Send(body, s.alert, s.server); err != nil {
-			log.Errorf("Failed sending email for alert %s: %v", s.alert.Name, err)
+			log.Errorf("Failed sending email for alert %s: %v", s.name, err)
 		} else {
-			log.Infof("Email alert %s triggered", s.alert.Name)
+			log.Infof("Email alert %s triggered", s.name)
 		}
 	}
 
