@@ -3,21 +3,23 @@ package actor
 import (
 	"sync"
 
+	"github.com/zinic/forculus/eventserver/service"
+
 	"github.com/zinic/forculus/eventserver/event"
 )
 
-type subscription struct {
+type dispatcher struct {
 	subscriber     Subscriber
 	eventInterests map[event.Type]struct{}
 }
 
-func (s subscription) Dispatch(event event.Event) {
+func (s dispatcher) Dispatch(event event.Event) {
 	if s.Accepts(event.Type) {
 		s.subscriber.Handle(event)
 	}
 }
 
-func (s subscription) Accepts(eventType event.Type) bool {
+func (s dispatcher) Accepts(eventType event.Type) bool {
 	if _, acceptsAllEvents := s.eventInterests[event.All]; !acceptsAllEvents {
 		_, acceptsEvent := s.eventInterests[eventType]
 		return acceptsEvent
@@ -26,36 +28,21 @@ func (s subscription) Accepts(eventType event.Type) bool {
 	return true
 }
 
-func NewReactor() Reactor {
+func NewReactor(manager *service.Manager) Reactor {
 	return &reactor{
-		subscriberLock: &sync.Mutex{},
+		manager:      manager,
+		dispatchLock: &sync.Mutex{},
 	}
 }
 
 type reactor struct {
-	subscribers    []subscription
-	subscriberLock *sync.Mutex
-}
-
-func (s *reactor) Start(waitGroup *sync.WaitGroup) {
-	for _, entry := range s.subscribers {
-		entry.subscriber.Start(waitGroup)
-	}
+	manager       *service.Manager
+	dispatchLock  *sync.Mutex
+	subscriptions []dispatcher
 }
 
 func (s *reactor) Stop() {
-	for _, entry := range s.subscribers {
-		entry.subscriber.Stop()
-	}
-}
-
-func (s *reactor) Dispatch(event event.Event) {
-	s.subscriberLock.Lock()
-	defer s.subscriberLock.Unlock()
-
-	for _, subscriber := range s.subscribers {
-		subscriber.Dispatch(event)
-	}
+	s.manager.Stop()
 }
 
 func (s *reactor) Register(subscriber Subscriber, eventInterests ...event.Type) {
@@ -64,8 +51,19 @@ func (s *reactor) Register(subscriber Subscriber, eventInterests ...event.Type) 
 		eventInterestMap[eventInterest] = struct{}{}
 	}
 
-	s.subscribers = append(s.subscribers, subscription{
+	s.subscriptions = append(s.subscriptions, dispatcher{
 		subscriber:     subscriber,
 		eventInterests: eventInterestMap,
 	})
+
+	s.manager.Start(subscriber)
+}
+
+func (s *reactor) Dispatch(event event.Event) {
+	s.dispatchLock.Lock()
+	defer s.dispatchLock.Unlock()
+
+	for _, subscription := range s.subscriptions {
+		subscription.Dispatch(event)
+	}
 }

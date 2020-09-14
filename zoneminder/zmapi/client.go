@@ -1,4 +1,4 @@
-package api
+package zmapi
 
 import (
 	"encoding/json"
@@ -12,39 +12,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/zinic/forculus/apitools"
+
 	"github.com/zinic/forculus/zoneminder/constants"
 	"golang.org/x/net/html"
 )
-
-type Endpoint struct {
-	rootURL string
-}
-
-func NewEndpoint(scheme, host string, port int, rootPath string) Endpoint {
-	return Endpoint{
-		rootURL: fmt.Sprintf("%s://%s:%d/%s", scheme, host, port, rootPath),
-	}
-}
-
-func (s Endpoint) Format(path ...string) string {
-	formattedPaths := make([]string, len(path))
-
-	for idx, path := range path {
-		formattedPaths[idx] = url.PathEscape(path)
-	}
-
-	return fmt.Sprintf("%s/%s", s.rootURL, strings.Join(formattedPaths, "/"))
-}
-
-func (s Endpoint) FormatQuery(query url.Values, path ...string) string {
-	formattedURL := s.Format(path...)
-
-	if query != nil && len(query) > 0 {
-		formattedURL = fmt.Sprintf("%s?%s", formattedURL, query.Encode())
-	}
-
-	return formattedURL
-}
 
 type Client interface {
 	Login() error
@@ -61,53 +33,37 @@ type Client interface {
 	AlertedMonitors() (map[string]AlertedMonitor, []error)
 }
 
-func NewClient(endpoint Endpoint, credentials LoginCredentials) Client {
+func NewClient(endpoint apitools.Endpoint, credentials LoginCredentials) Client {
 	return &client{
-		endpoint:    endpoint,
 		credentials: credentials,
-		httpClient:  &http.Client{},
+		httpClient:  apitools.NewHTTPClientWrapper(endpoint),
 	}
 }
 
 type client struct {
-	endpoint     Endpoint
 	credentials  LoginCredentials
 	loginSession *LoginSession
-	httpClient   *http.Client
+	httpClient   *apitools.HTTPClientWrapper
 }
 
-func copyURLValues(values url.Values) url.Values {
-	copied := make(url.Values, len(values))
-	for key, valueSet := range values {
-		copied[key] = valueSet
-	}
-
-	return copied
-}
-
-func (s *client) doRequest(method string, body io.Reader, query url.Values, header http.Header, path ...string) (*http.Response, error) {
-	queryCopy := copyURLValues(query)
+func (s *client) doGET(body io.Reader, query url.Values, header http.Header, path ...string) (*http.Response, error) {
+	queryCopy := apitools.CopyURLValues(query)
 
 	if _, hasToken := queryCopy["token"]; !hasToken && s.loginSession != nil {
 		queryCopy.Set("token", s.loginSession.Details.AccessToken)
 	}
 
-	//log.Debugf("Making %s API call to endpoint: %s", method, s.endpoint.FormatQuery(queryCopy, path...))
-
-	if req, err := http.NewRequest(method, s.endpoint.FormatQuery(queryCopy, path...), body); err != nil {
-		return nil, err
-	} else {
-		req.Header = header
-		return s.httpClient.Do(req)
-	}
-}
-
-func (s *client) doGET(body io.Reader, query url.Values, header http.Header, path ...string) (*http.Response, error) {
-	return s.doRequest(http.MethodGet, body, query, header, path...)
+	return s.httpClient.GET(body, queryCopy, header, path...)
 }
 
 func (s *client) doPOST(body io.Reader, query url.Values, header http.Header, path ...string) (*http.Response, error) {
-	return s.doRequest(http.MethodPost, body, query, header, path...)
+	queryCopy := apitools.CopyURLValues(query)
+
+	if _, hasToken := queryCopy["token"]; !hasToken && s.loginSession != nil {
+		queryCopy.Set("token", s.loginSession.Details.AccessToken)
+	}
+
+	return s.httpClient.POST(body, queryCopy, header, path...)
 }
 
 func (s *client) checkLogin() error {

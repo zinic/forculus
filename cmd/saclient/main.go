@@ -2,10 +2,11 @@ package main
 
 import (
 	"flag"
+	"time"
+
 	"github.com/zinic/forculus/cmd"
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/log"
-	"time"
 )
 
 func main() {
@@ -26,7 +27,7 @@ func main() {
 	}
 
 	// Load configuration and either output that it's valid or start the daemon
-	if cfg, err := config.LoadConfiguration(cfgPath); err != nil {
+	if cfg, err := config.LoadEventServerCfg(cfgPath); err != nil {
 		log.Fatalf("configuration error: %v", err)
 	} else {
 		client := cmd.NewZoneminderClient(cfg.Zoneminder)

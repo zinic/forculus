@@ -2,17 +2,20 @@ package logic
 
 import (
 	"fmt"
+	"github.com/zinic/forculus/recordkeeper/model"
+
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/eventserver/actor"
 	"github.com/zinic/forculus/eventserver/event"
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/storage"
-	"github.com/zinic/forculus/zoneminder/api"
+	"github.com/zinic/forculus/zoneminder/zmapi"
 )
 
-func NewUploader(name string, zmClient api.Client, storageProvider storage.Provider, cfg config.Uploader) actor.Subscriber {
+func NewUploader(name string, dispatch actor.Dispatch, zmClient zmapi.Client, storageProvider storage.Provider, cfg config.Uploader) actor.Subscriber {
 	uploader := EventUploader{
 		name:            name,
+		dispatch:        dispatch,
 		zmClient:        zmClient,
 		storageProvider: storageProvider,
 		cfg:             cfg,
@@ -23,7 +26,8 @@ func NewUploader(name string, zmClient api.Client, storageProvider storage.Provi
 
 type EventUploader struct {
 	name            string
-	zmClient        api.Client
+	dispatch        actor.Dispatch
+	zmClient        zmapi.Client
 	storageProvider storage.Provider
 	cfg             config.Uploader
 }
@@ -32,7 +36,7 @@ func (s *EventUploader) Logic(eventC chan event.Event, exitC chan struct{}) {
 	for {
 		select {
 		case nextEvent := <-eventC:
-			monitorEvent := nextEvent.Payload.(api.MonitorEvent)
+			monitorEvent := nextEvent.Payload.(zmapi.MonitorEvent)
 
 			if s.cfg.Filter.NameRegex != nil && !s.cfg.Filter.NameRegex.MatchString(monitorEvent.Name) {
 				log.Debugf("Event %s does not match the name regex filter for exporter %s", monitorEvent.Name, s.name)
@@ -61,6 +65,14 @@ func (s *EventUploader) Logic(eventC chan event.Event, exitC chan struct{}) {
 
 				log.Infof("Event %s exported successfully", monitorEvent.Name)
 			}
+
+			s.dispatch.Dispatch(event.Event{
+				Type: event.EventUploaded,
+				Payload: model.EventRecord{
+					StorageTarget: s.cfg.StorageTarget,
+					StorageKey:    eventFilename,
+				},
+			})
 
 		case <-exitC:
 			return

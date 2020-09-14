@@ -2,15 +2,17 @@ package storage
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/storage/aws"
-	"io"
 )
 
 type Provider interface {
 	Configure(cfg config.StorageProvider) error
 	Validate(cfg config.StorageProvider) error
 	Write(key string, reader io.Reader) error
+	Read(key string) (io.ReadCloser, error)
 }
 
 func newProvider(provider config.StorageProviderType) (Provider, error) {

@@ -1,13 +1,16 @@
 package aws
 
 import (
+	"context"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"io"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/defaults"
 	"github.com/aws/aws-sdk-go-v2/service/s3/s3manager"
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/errors"
-	"io"
 )
 
 const (
@@ -38,6 +41,7 @@ func newAWSConfig(cfg config.StorageProvider) aws.Config {
 
 type S3Provider struct {
 	cfg        config.StorageProvider
+	s3Client   *s3.Client
 	s3Uploader *s3manager.Uploader
 }
 
@@ -46,7 +50,9 @@ func (s *S3Provider) Configure(cfg config.StorageProvider) error {
 		return err
 	}
 
-	s.s3Uploader = s3manager.NewUploader(newAWSConfig(cfg))
+	awsCfg := newAWSConfig(cfg)
+	s.s3Uploader = s3manager.NewUploader(awsCfg)
+	s.s3Client = s3.New(awsCfg)
 	s.cfg = cfg
 	return nil
 }
@@ -86,4 +92,21 @@ func (s *S3Provider) Write(key string, reader io.Reader) error {
 
 	_, err := s.s3Uploader.Upload(input)
 	return err
+}
+
+func (s *S3Provider) Read(key string) (io.ReadCloser, error) {
+	if s.s3Uploader == nil {
+		return nil, ErrNotConfigured
+	}
+
+	req := s.s3Client.GetObjectRequest(&s3.GetObjectInput{
+		Bucket: aws.String(s.cfg.Properties[bucketProperty]),
+		Key:    aws.String(key),
+	})
+
+	if resp, err := req.Send(context.Background()); err != nil {
+		return nil, err
+	} else {
+		return resp.Body, nil
+	}
 }

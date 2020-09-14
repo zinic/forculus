@@ -4,22 +4,24 @@ import (
 	"sync"
 	"time"
 
+	"github.com/zinic/forculus/eventserver/service"
+
 	"github.com/zinic/forculus/eventserver/actor"
 
 	"github.com/zinic/forculus/eventserver/event"
 
 	"github.com/zinic/forculus/log"
 
-	"github.com/zinic/forculus/zoneminder/api"
+	"github.com/zinic/forculus/zoneminder/zmapi"
 )
 
 type MonitorWatch struct {
-	client     api.Client
+	client     zmapi.Client
 	dispatcher actor.Dispatch
 	exitC      chan struct{}
 }
 
-func NewMonitorWatch(client api.Client, dispatch actor.Dispatch) actor.Service {
+func NewMonitorWatch(client zmapi.Client, dispatch actor.Dispatch) service.Service {
 	return &MonitorWatch{
 		client:     client,
 		dispatcher: dispatch,
@@ -34,7 +36,7 @@ func (s *MonitorWatch) monitorWatchLoop() {
 
 	var (
 		loopTicker      = time.NewTicker(scanInterval)
-		watchedMonitors = make(map[string]api.AlertedMonitor)
+		watchedMonitors = make(map[string]zmapi.AlertedMonitor)
 	)
 
 	defer loopTicker.Stop()

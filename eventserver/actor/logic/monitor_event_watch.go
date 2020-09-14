@@ -7,10 +7,10 @@ import (
 
 	"github.com/zinic/forculus/eventserver/event"
 	"github.com/zinic/forculus/log"
-	"github.com/zinic/forculus/zoneminder/api"
+	"github.com/zinic/forculus/zoneminder/zmapi"
 )
 
-func RegisterMonitorEventWatch(reactor actor.Reactor, client api.Client) {
+func RegisterMonitorEventWatch(reactor actor.Reactor, client zmapi.Client) {
 	watcher := &MonitorEventWatch{
 		watchedMonitors: make(map[string]time.Time),
 		seenEvents:      make(map[string]time.Time),
@@ -26,7 +26,7 @@ type MonitorEventWatch struct {
 	watchedMonitors map[string]time.Time
 	seenEvents      map[string]time.Time
 	dispatcher      actor.Dispatch
-	client          api.Client
+	client          zmapi.Client
 }
 
 func (s *MonitorEventWatch) loadMostRecentEvents() {
@@ -85,7 +85,7 @@ func (s *MonitorEventWatch) Logic(eventC chan event.Event, exitC chan struct{}) 
 	for {
 		select {
 		case nextEvent := <-eventC:
-			alertedMonitor := nextEvent.Payload.(api.AlertedMonitor)
+			alertedMonitor := nextEvent.Payload.(zmapi.AlertedMonitor)
 			s.watchedMonitors[alertedMonitor.Monitor.Details.ID] = time.Now().Add(searchWindow)
 
 		case <-loopTicker.C:

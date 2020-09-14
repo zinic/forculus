@@ -22,7 +22,7 @@ func parseAlertFilterFields(cfg alertFilter) (AlertFilter, error) {
 	return filter, nil
 }
 
-func compileUploaders(cfg configuration) (map[string]Uploader, error) {
+func compileUploaders(cfg eventServerConfiguration) (map[string]Uploader, error) {
 	uploaders := make(map[string]Uploader, len(cfg.Uploaders))
 	for name, rawUploader := range cfg.Uploaders {
 		if filter, err := parseAlertFilterFields(rawUploader.Filter); err != nil {
@@ -38,7 +38,7 @@ func compileUploaders(cfg configuration) (map[string]Uploader, error) {
 	return uploaders, nil
 }
 
-func compileEmailAlerts(cfg configuration) (map[string]EmailAlert, error) {
+func compileEmailAlerts(cfg eventServerConfiguration) (map[string]EmailAlert, error) {
 	alerts := make(map[string]EmailAlert, len(cfg.EmailAlerts))
 	for name, rawEmailAlert := range cfg.EmailAlerts {
 		if filter, err := parseAlertFilterFields(rawEmailAlert.Filter); err != nil {
@@ -74,7 +74,7 @@ func validateEmailAlertSMTPReferences(cfg EventServerConfig) error {
 	return nil
 }
 
-func parseConfigurationFields(cfg configuration) (EventServerConfig, error) {
+func parseEventServerCfg(cfg eventServerConfiguration) (EventServerConfig, error) {
 	compiledCfg := EventServerConfig{
 		Zoneminder:       cfg.Zoneminder,
 		StorageProviders: cfg.StorageProviders,

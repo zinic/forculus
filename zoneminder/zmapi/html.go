@@ -1,9 +1,10 @@
-package api
+package zmapi
 
 import (
+	"strings"
+
 	"github.com/zinic/forculus/zoneminder/constants"
 	"golang.org/x/net/html"
-	"strings"
 )
 
 func FindNodeAttrByKey(node *html.Node, key string) (html.Attribute, bool) {

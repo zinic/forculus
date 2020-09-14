@@ -2,24 +2,22 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"github.com/zinic/forculus/eventserver/event"
-	"github.com/zinic/forculus/storage"
-	"sync"
 
 	"github.com/zinic/forculus/cmd"
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/eventserver/actor"
 	"github.com/zinic/forculus/eventserver/actor/logic"
+	"github.com/zinic/forculus/eventserver/event"
+	"github.com/zinic/forculus/eventserver/service"
 	"github.com/zinic/forculus/log"
 )
 
 func start(cfg config.EventServerConfig) error {
 	var (
-		zmClient     = cmd.NewZoneminderClient(cfg.Zoneminder)
-		waitGroup    = &sync.WaitGroup{}
-		reactor      = actor.NewReactor()
-		monitorWatch = logic.NewMonitorWatch(zmClient, reactor)
+		zmClient       = cmd.NewZoneminderClient(cfg.Zoneminder)
+		serviceManager = service.NewManager()
+		reactor        = actor.NewReactor(serviceManager)
+		monitorWatch   = logic.NewMonitorWatch(zmClient, reactor)
 	)
 
 	if log.Thresholds().Accepts(log.LevelDebug) {
@@ -29,43 +27,36 @@ func start(cfg config.EventServerConfig) error {
 	logic.RegisterMonitorEventWatch(reactor, zmClient)
 
 	for alertName, alertCfg := range cfg.EmailAlerts {
-		logic.RegisterEmailer(reactor, alertName, alertCfg, cfg.SMTPServers[alertCfg.Server])
+		logic.RegisterEventEmailSender(reactor, alertName, alertCfg, cfg.SMTPServers[alertCfg.Server])
 	}
 
-	storageProviders := make(map[string]storage.Provider)
-	for providerName, storageProviderCfg := range cfg.StorageProviders {
-		if provider, err := storage.New(storageProviderCfg); err != nil {
-			return fmt.Errorf("failed initializing storage provider %s: %w", providerName, err)
-		} else {
-			storageProviders[providerName] = provider
+	for emailerName, emailerCfg := range cfg.Emailers {
+		reactor.Register(logic.NewEmailSender(emailerName, emailerCfg, cfg.SMTPServers[emailerCfg.Server]))
+	}
+
+	if storageProviders, err := cmd.InitializeStorageProviders(cfg.StorageProviders); err != nil {
+		log.Fatalf("Failed to initialize storage providers: %v", err)
+	} else {
+		for uploaderName, uploaderCfg := range cfg.Uploaders {
+			var (
+				provider = storageProviders[uploaderCfg.StorageTarget]
+				uploader = logic.NewUploader(uploaderName, reactor, zmClient, provider, uploaderCfg)
+			)
+
+			reactor.Register(uploader, event.NewMonitorEvent)
+			log.Debugf("New uploader %s registered to upload to storage provider %s", uploaderName, uploaderCfg.StorageTarget)
 		}
 
-		log.Debugf("New storage provider %s type %s registered", providerName, storageProviderCfg.Provider)
 	}
 
-	for uploaderName, uploaderCfg := range cfg.Uploaders {
-		var (
-			provider = storageProviders[uploaderCfg.StorageTarget]
-			uploader = logic.NewUploader(uploaderName, zmClient, provider, uploaderCfg)
-		)
-
-		reactor.Register(uploader, event.NewMonitorEvent)
-		log.Debugf("New uploader %s registered to upload to storage provider %s", uploaderName, uploaderCfg.StorageTarget)
-	}
-
-	reactor.Start(waitGroup)
-	monitorWatch.Start(waitGroup)
+	serviceManager.Start(monitorWatch)
 
 	cmd.WaitForSignal()
 
 	log.Info("Shutting down")
+	serviceManager.Stop()
 
-	reactor.Stop()
-	monitorWatch.Stop()
-
-	waitGroup.Wait()
-
-	log.Info("Shut down complete")
+	log.Info("Shutdown complete")
 	return nil
 }
 
@@ -86,6 +77,10 @@ func main() {
 	// Start with log configuration defaults
 	log.ConfigureDefaults()
 
+	if cfgPath == "" {
+		log.Fatalf("Configuration path required.")
+	}
+
 	// Configure log output
 	log.Configure()
 
@@ -98,7 +93,7 @@ func main() {
 	}
 
 	// Load configuration and either output that it's valid or start the daemon
-	if cfg, err := config.LoadConfiguration(cfgPath); err != nil {
+	if cfg, err := config.LoadEventServerCfg(cfgPath); err != nil {
 		log.Fatalf("configuration error: %v", err)
 	} else if validateCfg {
 		log.Fatalf("Not implemented")

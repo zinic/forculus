@@ -1,19 +1,13 @@
 package actor
 
 import (
-	"sync"
-
 	"github.com/zinic/forculus/eventserver/event"
+	"github.com/zinic/forculus/eventserver/service"
 )
-
-type Service interface {
-	Start(waitGroup *sync.WaitGroup)
-	Stop()
-}
 
 type Subscriber interface {
 	Handle(e event.Event)
-	Service
+	service.Service
 }
 
 type Dispatch interface {
@@ -22,6 +16,5 @@ type Dispatch interface {
 
 type Reactor interface {
 	Register(subscriber Subscriber, eventInterests ...event.Type)
-	Service
 	Dispatch
 }

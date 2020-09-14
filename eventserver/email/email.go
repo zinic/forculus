@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"net/smtp"
+	"strings"
 
 	"github.com/zinic/forculus/config"
 )
@@ -19,13 +20,13 @@ func tlsDial(smtpServer config.SMTPServer) (*tls.Conn, error) {
 	return tls.Dial("tcp", smtpServer.FormatAddress(), tlsConfig(smtpServer))
 }
 
-func formatMessage(body string, alert config.EmailAlert, smtpServer config.SMTPServer) []byte {
+func formatMessage(email Email, smtpServer config.SMTPServer) []byte {
 	var (
 		messageBuffer = &bytes.Buffer{}
 		headers       = map[string]string{
 			"From":    smtpServer.Sender,
-			"To":      alert.FormatRecipients(),
-			"Subject": alert.SubjectTemplate,
+			"To":      email.FormatRecipients(),
+			"Subject": email.Subject,
 		}
 	)
 
@@ -37,12 +38,22 @@ func formatMessage(body string, alert config.EmailAlert, smtpServer config.SMTPS
 	}
 
 	messageBuffer.WriteString("\r\n")
-	messageBuffer.WriteString(body)
+	messageBuffer.WriteString(email.Body)
 
 	return messageBuffer.Bytes()
 }
 
-func Send(body string, alert config.EmailAlert, smtpServer config.SMTPServer) error {
+type Email struct {
+	Subject    string
+	Body       string
+	Recipients []string
+}
+
+func (s Email) FormatRecipients() string {
+	return strings.Join(s.Recipients, ",")
+}
+
+func Send(email Email, smtpServer config.SMTPServer) error {
 	if conn, err := tlsDial(smtpServer); err != nil {
 		return err
 	} else {
@@ -62,7 +73,7 @@ func Send(body string, alert config.EmailAlert, smtpServer config.SMTPServer) er
 				return err
 			}
 
-			for _, recipient := range alert.Recipients {
+			for _, recipient := range email.Recipients {
 				if err = smtpClient.Rcpt(recipient); err != nil {
 					return err
 				}
@@ -73,7 +84,7 @@ func Send(body string, alert config.EmailAlert, smtpServer config.SMTPServer) er
 			} else {
 				defer dataWriter.Close()
 
-				if _, err := dataWriter.Write(formatMessage(body, alert, smtpServer)); err != nil {
+				if _, err := dataWriter.Write(formatMessage(email, smtpServer)); err != nil {
 					return err
 				}
 			}
