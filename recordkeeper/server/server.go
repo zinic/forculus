@@ -10,7 +10,7 @@ import (
 func newMux(handler Handler, users map[string]config.AuthorizationConfig) http.Handler {
 	router := mux.NewRouter()
 	router.HandleFunc("/event", authFilter(users, methodFilter(handler.PostEvent, http.MethodPost)))
-	router.HandleFunc("/event/{even_id}", methodFilter(handler.PostEvent, http.MethodGet))
+	router.HandleFunc("/event/{event_id}", methodFilter(handler.GetEvent, http.MethodGet))
 
 	return router
 }

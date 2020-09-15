@@ -28,5 +28,5 @@ func (s *responseWrapper) Error(statusCode int, message string) {
 }
 
 func (s *responseWrapper) Errorf(statusCode int, format string, args ...interface{}) {
-	s.Errorf(statusCode, fmt.Sprintf(format, args...))
+	s.Error(statusCode, fmt.Sprintf(format, args...))
 }

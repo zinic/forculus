@@ -1,12 +1,10 @@
-package db
+package rkdb
 
 import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"github.com/zinic/forculus/errors"
-
-	"github.com/zinic/forculus/recordkeeper/model"
 
 	"github.com/dgraph-io/badger/v2"
 )
@@ -62,7 +60,7 @@ func (s *Database) Close() error {
 	return s.db.Close()
 }
 
-func (s *Database) WriteEventRecord(record model.EventRecord) (uint64, error) {
+func (s *Database) WriteEventRecord(record EventRecord) (uint64, error) {
 	txn := s.db.NewTransaction(true)
 	defer txn.Discard()
 
@@ -81,10 +79,10 @@ func (s *Database) WriteEventRecord(record model.EventRecord) (uint64, error) {
 	}
 }
 
-func (s *Database) GetEventRecord(id uint64) (model.EventRecord, error) {
+func (s *Database) GetEventRecord(id uint64) (EventRecord, error) {
 	var (
 		txn    = s.db.NewTransaction(false)
-		record model.EventRecord
+		record EventRecord
 	)
 
 	defer txn.Discard()

@@ -2,34 +2,38 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gorilla/mux"
+	"github.com/zinic/forculus/cmd"
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/storage"
 	"io"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"strconv"
 
-	"github.com/zinic/forculus/recordkeeper/model"
-
 	"github.com/zinic/forculus/config"
-	"github.com/zinic/forculus/recordkeeper/db"
+	"github.com/zinic/forculus/recordkeeper/rkdb"
 )
 
 func NewHandler(cfg config.RecordKeeperConfig) (Handler, error) {
-	if database, err := db.NewDatabase(cfg.DatabasePath); err != nil {
+	if database, err := rkdb.NewDatabase(cfg.DatabasePath); err != nil {
 		return Handler{}, nil
+	} else if storageProviders, err := cmd.InitializeStorageProviders(cfg.StorageProviders); err != nil {
+		return Handler{}, err
 	} else {
 		return Handler{
-			cfg:      cfg,
-			database: database,
+			cfg:              cfg,
+			database:         database,
+			storageProviders: storageProviders,
 		}, nil
 	}
 }
 
 type Handler struct {
 	cfg              config.RecordKeeperConfig
-	database         *db.Database
+	database         *rkdb.Database
 	storageProviders map[string]storage.Provider
 }
 
@@ -53,7 +57,7 @@ func (s *Handler) GetEvent(resp ResponseWrapper, req *http.Request) {
 	} else if len(accessTokenValues) > 1 {
 		resp.Error(http.StatusBadRequest, "too many access tokens specified")
 	} else if eventRecord, err := s.database.GetEventRecord(eventRecordID); err != nil {
-		if err == db.ErrEventNotFound {
+		if err == rkdb.ErrEventNotFound {
 			resp.Errorf(http.StatusNotFound, "event ID %s not found", rawEventRecordID)
 		} else {
 			resp.Error(http.StatusInternalServerError, "database error")
@@ -62,11 +66,16 @@ func (s *Handler) GetEvent(resp ResponseWrapper, req *http.Request) {
 		resp.WriteHeader(http.StatusUnauthorized)
 	} else if storageProvider, hasProvider := s.storageProviders[eventRecord.StorageTarget]; !hasProvider {
 		resp.Errorf(http.StatusInternalServerError, "storage provider %s is not configured", eventRecord.StorageTarget)
+	} else if eventDetails, err := storageProvider.Stat(eventRecord.StorageKey); err != nil {
+		resp.Error(http.StatusInternalServerError, "storage provider error")
 	} else if eventInput, err := storageProvider.Read(eventRecord.StorageKey); err != nil {
 		resp.Error(http.StatusInternalServerError, "storage provider error")
 	} else {
 		defer eventInput.Close()
 
+		resp.Header().Set("Content-Type", mime.TypeByExtension(eventRecord.StorageKey))
+		resp.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", eventRecord.StorageKey))
+		resp.Header().Set("Content-Length", fmt.Sprintf("%d", eventDetails.Size))
 		resp.WriteHeader(http.StatusOK)
 
 		if _, err := io.Copy(resp, eventInput); err != nil {
@@ -79,7 +88,7 @@ func (s *Handler) PostEvent(resp ResponseWrapper, req *http.Request) {
 	if content, err := ioutil.ReadAll(req.Body); err != nil {
 		resp.Error(http.StatusBadRequest, "failed to read request body")
 	} else {
-		var putEventReq model.EventRecord
+		var putEventReq rkdb.EventRecord
 
 		if err := json.Unmarshal(content, &putEventReq); err != nil {
 			resp.Errorf(http.StatusBadRequest, "bad JSON input: %v", err)

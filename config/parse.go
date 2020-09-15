@@ -79,6 +79,7 @@ func parseEventServerCfg(cfg eventServerConfiguration) (EventServerConfig, error
 		Zoneminder:       cfg.Zoneminder,
 		StorageProviders: cfg.StorageProviders,
 		SMTPServers:      cfg.SMTPServers,
+		RecordKeepers:    cfg.RecordKeepers,
 	}
 
 	if compiledUploaders, err := compileUploaders(cfg); err != nil {

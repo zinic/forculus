@@ -2,8 +2,7 @@ package config
 
 import (
 	"fmt"
-
-	"github.com/zinic/forculus/eventserver/event"
+	"github.com/zinic/forculus/eventserver"
 )
 
 type RecordKeeperConfig struct {
@@ -81,9 +80,9 @@ type emailAlert struct {
 }
 
 type alertFilter struct {
-	EventTrigger        event.Type `toml:"event_trigger"`
-	NameFilterRegex     string     `toml:"name_filter"`
-	AlertFrameThreshold int        `toml:"alert_frame_threshold"`
-	EventTimeAfter      string     `toml:"event_time_after"`
-	EventTimeBefore     string     `toml:"event_time_before"`
+	EventTrigger        eventserver.EventType `toml:"event_trigger"`
+	NameFilterRegex     string                `toml:"name_filter"`
+	AlertFrameThreshold int                   `toml:"alert_frame_threshold"`
+	EventTimeAfter      string                `toml:"event_time_after"`
+	EventTimeBefore     string                `toml:"event_time_before"`
 }

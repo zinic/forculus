@@ -1,14 +1,10 @@
-package logic
+package services
 
 import (
+	"github.com/zinic/forculus/eventserver"
+	"github.com/zinic/forculus/service"
 	"sync"
 	"time"
-
-	"github.com/zinic/forculus/eventserver/service"
-
-	"github.com/zinic/forculus/eventserver/actor"
-
-	"github.com/zinic/forculus/eventserver/event"
 
 	"github.com/zinic/forculus/log"
 
@@ -17,11 +13,11 @@ import (
 
 type MonitorWatch struct {
 	client     zmapi.Client
-	dispatcher actor.Dispatch
+	dispatcher eventserver.EventDispatch
 	exitC      chan struct{}
 }
 
-func NewMonitorWatch(client zmapi.Client, dispatch actor.Dispatch) service.Service {
+func NewMonitorWatch(client zmapi.Client, dispatch eventserver.EventDispatch) service.Service {
 	return &MonitorWatch{
 		client:     client,
 		dispatcher: dispatch,
@@ -60,15 +56,15 @@ func (s *MonitorWatch) monitorWatchLoop() {
 			if lastWatch, watching := watchedMonitors[monitorID]; !watching {
 				watchedMonitors[monitorID] = alertedMonitor
 
-				s.dispatcher.Dispatch(event.Event{
-					Type:    event.MonitorAlerted,
+				s.dispatcher.Send(eventserver.Event{
+					Type:    eventserver.MonitorAlerted,
 					Payload: alertedMonitor,
 				})
 			} else if lastWatch.AlarmStatus != alertedMonitor.AlarmStatus {
 				watchedMonitors[monitorID] = alertedMonitor
 
-				s.dispatcher.Dispatch(event.Event{
-					Type:    event.MonitorAlertStatusChanged,
+				s.dispatcher.Send(eventserver.Event{
+					Type:    eventserver.MonitorAlertStatusChanged,
 					Payload: alertedMonitor,
 				})
 			}
@@ -78,8 +74,8 @@ func (s *MonitorWatch) monitorWatchLoop() {
 			if _, stillAlerted := alertedMonitors[monitorID]; !stillAlerted {
 				delete(watchedMonitors, monitorID)
 
-				s.dispatcher.Dispatch(event.Event{
-					Type:    event.MonitorExitingAlert,
+				s.dispatcher.Send(eventserver.Event{
+					Type:    eventserver.MonitorExitingAlert,
 					Payload: watchedMonitor,
 				})
 			}

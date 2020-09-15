@@ -1,21 +1,13 @@
-package storage
+package providers
 
 import (
 	"fmt"
-	"io"
-
 	"github.com/zinic/forculus/config"
-	"github.com/zinic/forculus/storage/aws"
+	"github.com/zinic/forculus/storage"
+	"github.com/zinic/forculus/storage/providers/aws"
 )
 
-type Provider interface {
-	Configure(cfg config.StorageProvider) error
-	Validate(cfg config.StorageProvider) error
-	Write(key string, reader io.Reader) error
-	Read(key string) (io.ReadCloser, error)
-}
-
-func newProvider(provider config.StorageProviderType) (Provider, error) {
+func newProvider(provider config.StorageProviderType) (storage.Provider, error) {
 	switch provider {
 	case config.ProviderAWS:
 		return &aws.S3Provider{}, nil
@@ -25,7 +17,7 @@ func newProvider(provider config.StorageProviderType) (Provider, error) {
 	}
 }
 
-func New(cfg config.StorageProvider) (Provider, error) {
+func New(cfg config.StorageProvider) (storage.Provider, error) {
 	if provider, err := newProvider(cfg.Provider); err != nil {
 		return nil, err
 	} else if err := provider.Configure(cfg); err != nil {

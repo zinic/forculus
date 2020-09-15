@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
+	"github.com/zinic/forculus/recordkeeper/rkdb"
 
 	"github.com/zinic/forculus/apitools"
-	"github.com/zinic/forculus/recordkeeper/model"
 	"github.com/zinic/forculus/recordkeeper/rkapi"
 )
 
 func main() {
-	eventRecord := model.EventRecord{
+	eventRecord := rkdb.EventRecord{
 		StorageTarget: "aws_s3",
 		StorageKey:    "event-12345.tar.gz",
 		AccessToken:   "access_token",

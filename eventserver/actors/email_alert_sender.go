@@ -1,25 +1,23 @@
-package logic
+package actors
 
 import (
 	"fmt"
-
-	"github.com/zinic/forculus/eventserver/actor"
+	"github.com/zinic/forculus/eventserver"
 
 	"github.com/zinic/forculus/config"
-	"github.com/zinic/forculus/eventserver/email"
-	"github.com/zinic/forculus/eventserver/event"
+	"github.com/zinic/forculus/email"
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/zoneminder/zmapi"
 )
 
-func RegisterEventEmailSender(reactor actor.Reactor, name string, alert config.EmailAlert, server config.SMTPServer) {
-	emailSender := EventEmailSender{
+func RegisterEventEmailSender(reactor eventserver.SubscriptionManager, name string, alert config.EmailAlert, server config.SMTPServer) {
+	emailSender := &EventEmailSender{
 		name:   name,
 		alert:  alert,
 		server: server,
 	}
 
-	reactor.Register(actor.NewSubscriber(emailSender.Logic), event.All)
+	reactor.Register(emailSender.Logic, eventserver.All)
 }
 
 type EventEmailSender struct {
@@ -28,16 +26,17 @@ type EventEmailSender struct {
 	server config.SMTPServer
 }
 
-func (s *EventEmailSender) handleEvent(nextEvent event.Event) {
+func (s *EventEmailSender) handleEvent(nextEvent eventserver.Event) {
 	if s.alert.Filter.EventTrigger != "" && nextEvent.Type != s.alert.Filter.EventTrigger {
 		return
 	}
 
 	switch nextEvent.Type {
-	case event.MonitorAlerted:
+	case eventserver.MonitorAlerted:
 		alertedMonitor := nextEvent.Payload.(zmapi.AlertedMonitor)
 		if alertFrames, err := alertedMonitor.Monitor.Details.ParseAlertFrameCount(); err != nil {
 			log.Errorf("Failed to parse alert frame count for monitor %s: %v", alertedMonitor.Monitor.Details.Name, err)
+			return
 		} else if s.alert.Filter.AlertFrameThreshold > 0 && s.alert.Filter.AlertFrameThreshold > alertFrames {
 			return
 		}
@@ -60,23 +59,24 @@ func (s *EventEmailSender) handleEvent(nextEvent event.Event) {
 			log.Infof("Email alert %s triggered", s.name)
 		}
 
-	case event.NewMonitorEvent:
-		monitorEvent := nextEvent.Payload.(zmapi.MonitorEvent)
-		if s.alert.Filter.NameRegex != nil && !s.alert.Filter.NameRegex.MatchString(monitorEvent.Name) {
+	case eventserver.MonitorEventRecorded:
+		eventRecordedPayload := nextEvent.Payload.(MonitorEventRecordedPayload)
+		if s.alert.Filter.NameRegex != nil && !s.alert.Filter.NameRegex.MatchString(eventRecordedPayload.Source.Name) {
 			log.Debugf("Monitor event %s did not match alert %s regex %s",
-				monitorEvent.Name, s.name, s.alert.Filter.NameRegex)
+				eventRecordedPayload.Source.Name, s.name, s.alert.Filter.NameRegex)
 			return
 		}
 
-		if alertFrames, err := monitorEvent.ParseAlertFrames(); err != nil {
-			log.Errorf("Failed to parse alert frame count for monitor event %s: %v", monitorEvent.Name, err)
+		if alertFrames, err := eventRecordedPayload.Source.ParseAlertFrames(); err != nil {
+			log.Errorf("Failed to parse alert frame count for monitor event ass %s: %v", eventRecordedPayload.Source.Name, err)
 		} else if s.alert.Filter.AlertFrameThreshold > 0 && s.alert.Filter.AlertFrameThreshold > alertFrames {
 			return
 		}
 
+		body := fmt.Sprintf("A new monitor event %s (%s) has become available.", eventRecordedPayload.Source.Name, eventRecordedPayload.AccessURL)
 		emailTemplate := email.Email{
 			Subject:    s.alert.SubjectTemplate,
-			Body:       fmt.Sprintf("A new monitor event %s has become available.", monitorEvent.Name),
+			Body:       body,
 			Recipients: s.alert.Recipients,
 		}
 
@@ -89,7 +89,7 @@ func (s *EventEmailSender) handleEvent(nextEvent event.Event) {
 
 }
 
-func (s *EventEmailSender) Logic(eventC chan event.Event, exitC chan struct{}) {
+func (s *EventEmailSender) Logic(eventC <-chan eventserver.Event, exitC chan struct{}) {
 	for {
 		select {
 		case nextEvent := <-eventC:

@@ -1,16 +1,13 @@
-package logic
+package actors
 
 import (
 	"github.com/zinic/forculus/apitools"
 	"github.com/zinic/forculus/config"
-	"github.com/zinic/forculus/eventserver/actor"
-	"github.com/zinic/forculus/eventserver/email"
-	"github.com/zinic/forculus/eventserver/event"
+	"github.com/zinic/forculus/eventserver"
 	"github.com/zinic/forculus/log"
-	"github.com/zinic/forculus/recordkeeper/model"
 	"github.com/zinic/forculus/recordkeeper/rkapi"
+	"github.com/zinic/forculus/recordkeeper/rkdb"
 	"math/rand"
-	"strings"
 )
 
 const (
@@ -28,7 +25,7 @@ func newAccessToken() string {
 	return string(buf)
 }
 
-func NewRecordKeeper(dispatch actor.Dispatch, cfg config.RecordKeeperClient) RecordKeeper {
+func NewRecordKeeper(dispatch eventserver.EventDispatch, cfg config.RecordKeeperClient) eventserver.EventHandlerFunc {
 	var (
 		endpoint    = apitools.NewEndpoint(cfg.Scheme, cfg.Host, cfg.Port, "")
 		credentials = rkapi.Credentials{
@@ -37,41 +34,44 @@ func NewRecordKeeper(dispatch actor.Dispatch, cfg config.RecordKeeperClient) Rec
 		}
 	)
 
-	return RecordKeeper{
+	rk := &RecordKeeper{
 		cfg:      cfg,
 		dispatch: dispatch,
 		endpoint: endpoint,
 		client:   rkapi.NewClient(credentials, endpoint),
 	}
+
+	return rk.Logic
 }
 
 type RecordKeeper struct {
 	cfg      config.RecordKeeperClient
-	dispatch actor.Dispatch
+	dispatch eventserver.EventDispatch
 	endpoint apitools.Endpoint
 	client   rkapi.Client
 }
 
-func (s *RecordKeeper) Logic(eventC chan event.Event, exitC chan struct{}) {
+func (s *RecordKeeper) Logic(eventC <-chan eventserver.Event, exitC chan struct{}) {
 	for {
 		select {
 		case nextEvent := <-eventC:
-			eventRecord := nextEvent.Payload.(model.EventRecord)
-			eventRecord.AccessToken = newAccessToken()
+			var (
+				eventUploadedPayload = nextEvent.Payload.(MonitorEventUploadedPayload)
+				createRecordReq      = rkdb.CreateEventRecord{
+					StorageTarget: eventUploadedPayload.StorageTarget,
+					StorageKey:    eventUploadedPayload.StorageKey,
+					AccessToken:   newAccessToken(),
+				}
+			)
 
-			if newRecord, err := s.client.CreateEventRecord(eventRecord); err != nil {
+			if newRecordID, err := s.client.CreateEventRecord(createRecordReq); err != nil {
 				log.Errorf("Failed to create new event record via the record keeper API: %v")
 			} else {
-				bodyWriter := strings.Builder{}
-				bodyWriter.WriteString("New even available at record keeper: ")
-				bodyWriter.WriteString(s.client.FormatEventURL(newRecord))
-				bodyWriter.WriteRune('\n')
-
-				s.dispatch.Dispatch(event.Event{
-					Type: event.EmailNotice,
-					Payload: email.Email{
-						Subject:    "New Event in Record Keeper",
-						Body:       bodyWriter.String(),
+				s.dispatch.Send(eventserver.Event{
+					Type: eventserver.MonitorEventRecorded,
+					Payload: MonitorEventRecordedPayload{
+						Source:    eventUploadedPayload.Source,
+						AccessURL: s.client.FormatEventURL(newRecordID, createRecordReq.AccessToken),
 					},
 				})
 			}

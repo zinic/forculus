@@ -5,12 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/zinic/forculus/recordkeeper/rkdb"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
 	"github.com/zinic/forculus/apitools"
-	"github.com/zinic/forculus/recordkeeper/model"
 	"github.com/zinic/forculus/recordkeeper/server"
 )
 
@@ -27,8 +27,8 @@ func NewClient(credentials Credentials, endpoint apitools.Endpoint) Client {
 }
 
 type Client interface {
-	CreateEventRecord(record model.EventRecord) (model.EventRecord, error)
-	FormatEventURL(record model.EventRecord) string
+	CreateEventRecord(req rkdb.CreateEventRecord) (uint64, error)
+	FormatEventURL(id uint64, accessToken string) string
 }
 
 type recordKeeperClient struct {
@@ -46,36 +46,36 @@ func (s *recordKeeperClient) authHeaderValue() string {
 	return authHash
 }
 
-func (s *recordKeeperClient) FormatEventURL(record model.EventRecord) string {
+func (s *recordKeeperClient) FormatEventURL(id uint64, accessToken string) string {
 	query := url.Values{
-		server.EventAccessTokenKey: []string{record.AccessToken},
+		server.EventAccessTokenKey: []string{accessToken},
 	}
 
-	return s.httpClient.Endpoint.FormatQuery(query, "event", fmt.Sprintf("%d", record.ID))
+	return s.httpClient.Endpoint.FormatQuery(query, "event", fmt.Sprintf("%d", id))
 }
 
-func (s *recordKeeperClient) CreateEventRecord(record model.EventRecord) (model.EventRecord, error) {
+func (s *recordKeeperClient) CreateEventRecord(req rkdb.CreateEventRecord) (uint64, error) {
 	headers := http.Header{
 		server.AuthorizationHeaderKey: []string{s.authHeaderValue()},
 	}
 
-	if output, err := json.Marshal(record); err != nil {
-		return model.EventRecord{}, err
+	if output, err := json.Marshal(req); err != nil {
+		return 0, err
 	} else if resp, err := s.httpClient.POST(bytes.NewBuffer(output), nil, headers, "event"); err != nil {
-		return model.EventRecord{}, err
+		return 0, err
 	} else {
 		defer resp.Body.Close()
 
-		var newRecord model.EventRecord
+		var newRecord rkdb.EventRecord
 
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-			return model.EventRecord{}, fmt.Errorf("response error %d", resp.StatusCode)
+			return 0, fmt.Errorf("response error %d", resp.StatusCode)
 		} else if input, err := ioutil.ReadAll(resp.Body); err != nil {
-			return model.EventRecord{}, fmt.Errorf("failed to read response body %v", err)
+			return 0, fmt.Errorf("failed to read response body %v", err)
 		} else if err := json.Unmarshal(input, &newRecord); err != nil {
-			return model.EventRecord{}, fmt.Errorf("failed to unmarshal response body %v", err)
+			return 0, fmt.Errorf("failed to unmarshal response body %v", err)
 		} else {
-			return newRecord, nil
+			return newRecord.ID, nil
 		}
 	}
 }

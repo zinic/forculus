@@ -2,36 +2,34 @@ package main
 
 import (
 	"flag"
+	"github.com/zinic/forculus/eventserver"
+	"github.com/zinic/forculus/eventserver/services"
 
 	"github.com/zinic/forculus/cmd"
 	"github.com/zinic/forculus/config"
-	"github.com/zinic/forculus/eventserver/actor"
-	"github.com/zinic/forculus/eventserver/actor/logic"
-	"github.com/zinic/forculus/eventserver/event"
-	"github.com/zinic/forculus/eventserver/service"
+	"github.com/zinic/forculus/eventserver/actors"
 	"github.com/zinic/forculus/log"
+	"github.com/zinic/forculus/service"
 )
 
 func start(cfg config.EventServerConfig) error {
 	var (
 		zmClient       = cmd.NewZoneminderClient(cfg.Zoneminder)
 		serviceManager = service.NewManager()
-		reactor        = actor.NewReactor(serviceManager)
-		monitorWatch   = logic.NewMonitorWatch(zmClient, reactor)
+		reactor        = eventserver.NewDispatch(serviceManager)
+		monitorWatch   = services.NewMonitorWatch(zmClient, reactor)
 	)
 
 	if log.Thresholds().Accepts(log.LevelDebug) {
-		logic.RegisterEventLogger(reactor)
+		actors.RegisterEventLogger(reactor)
 	}
 
-	logic.RegisterMonitorEventWatch(reactor, zmClient)
+	actors.RegisterMonitorEventWatch(reactor, zmClient)
 
 	for alertName, alertCfg := range cfg.EmailAlerts {
-		logic.RegisterEventEmailSender(reactor, alertName, alertCfg, cfg.SMTPServers[alertCfg.Server])
-	}
+		actors.RegisterEventEmailSender(reactor, alertName, alertCfg, cfg.SMTPServers[alertCfg.Server])
 
-	for emailerName, emailerCfg := range cfg.Emailers {
-		reactor.Register(logic.NewEmailSender(emailerName, emailerCfg, cfg.SMTPServers[emailerCfg.Server]))
+		log.Debugf("New email alert %s registered to send to SMTP server %s", alertName, alertCfg.Server)
 	}
 
 	if storageProviders, err := cmd.InitializeStorageProviders(cfg.StorageProviders); err != nil {
@@ -40,13 +38,20 @@ func start(cfg config.EventServerConfig) error {
 		for uploaderName, uploaderCfg := range cfg.Uploaders {
 			var (
 				provider = storageProviders[uploaderCfg.StorageTarget]
-				uploader = logic.NewUploader(uploaderName, reactor, zmClient, provider, uploaderCfg)
+				uploader = actors.NewUploader(uploaderName, reactor, zmClient, provider, uploaderCfg)
 			)
 
-			reactor.Register(uploader, event.NewMonitorEvent)
+			reactor.Register(uploader, eventserver.MonitorNewEvent)
+			
 			log.Debugf("New uploader %s registered to upload to storage provider %s", uploaderName, uploaderCfg.StorageTarget)
 		}
 
+	}
+
+	for recordKeeperName, recordKeeperCfg := range cfg.RecordKeepers {
+		reactor.Register(actors.NewRecordKeeper(reactor, recordKeeperCfg), eventserver.MonitorEventUploaded)
+
+		log.Debugf("New record keeper %s registered", recordKeeperName)
 	}
 
 	serviceManager.Start(monitorWatch)

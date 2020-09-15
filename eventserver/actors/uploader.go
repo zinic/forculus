@@ -1,19 +1,16 @@
-package logic
+package actors
 
 import (
 	"fmt"
-	"github.com/zinic/forculus/recordkeeper/model"
-
 	"github.com/zinic/forculus/config"
-	"github.com/zinic/forculus/eventserver/actor"
-	"github.com/zinic/forculus/eventserver/event"
+	"github.com/zinic/forculus/eventserver"
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/storage"
 	"github.com/zinic/forculus/zoneminder/zmapi"
 )
 
-func NewUploader(name string, dispatch actor.Dispatch, zmClient zmapi.Client, storageProvider storage.Provider, cfg config.Uploader) actor.Subscriber {
-	uploader := EventUploader{
+func NewUploader(name string, dispatch eventserver.EventDispatch, zmClient zmapi.Client, storageProvider storage.Provider, cfg config.Uploader) eventserver.EventHandlerFunc {
+	uploader := &EventUploader{
 		name:            name,
 		dispatch:        dispatch,
 		zmClient:        zmClient,
@@ -21,18 +18,18 @@ func NewUploader(name string, dispatch actor.Dispatch, zmClient zmapi.Client, st
 		cfg:             cfg,
 	}
 
-	return actor.NewSubscriber(uploader.Logic)
+	return uploader.Logic
 }
 
 type EventUploader struct {
 	name            string
-	dispatch        actor.Dispatch
+	dispatch        eventserver.EventDispatch
 	zmClient        zmapi.Client
 	storageProvider storage.Provider
 	cfg             config.Uploader
 }
 
-func (s *EventUploader) Logic(eventC chan event.Event, exitC chan struct{}) {
+func (s *EventUploader) Logic(eventC <-chan eventserver.Event, exitC chan struct{}) {
 	for {
 		select {
 		case nextEvent := <-eventC:
@@ -66,9 +63,10 @@ func (s *EventUploader) Logic(eventC chan event.Event, exitC chan struct{}) {
 				log.Infof("Event %s exported successfully", monitorEvent.Name)
 			}
 
-			s.dispatch.Dispatch(event.Event{
-				Type: event.EventUploaded,
-				Payload: model.EventRecord{
+			s.dispatch.Send(eventserver.Event{
+				Type: eventserver.MonitorEventUploaded,
+				Payload: MonitorEventUploadedPayload{
+					Source:        monitorEvent,
 					StorageTarget: s.cfg.StorageTarget,
 					StorageKey:    eventFilename,
 				},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/zinic/forculus/storage"
 	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -108,5 +109,25 @@ func (s *S3Provider) Read(key string) (io.ReadCloser, error) {
 		return nil, err
 	} else {
 		return resp.Body, nil
+	}
+}
+
+func (s *S3Provider) Stat(key string) (storage.Details, error) {
+	var details storage.Details
+
+	if s.s3Uploader == nil {
+		return details, ErrNotConfigured
+	}
+
+	req := s.s3Client.HeadObjectRequest(&s3.HeadObjectInput{
+		Bucket: aws.String(s.cfg.Properties[bucketProperty]),
+		Key:    aws.String(key),
+	})
+
+	if resp, err := req.Send(context.Background()); err != nil {
+		return details, err
+	} else {
+		details.Size = *resp.ContentLength
+		return details, nil
 	}
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/zinic/forculus/storage/providers"
 	"os"
 	"os/signal"
 	"syscall"
@@ -18,7 +19,7 @@ import (
 func InitializeStorageProviders(storageProviderCfgs map[string]config.StorageProvider) (map[string]storage.Provider, error) {
 	storageProviders := make(map[string]storage.Provider)
 	for providerName, storageProviderCfg := range storageProviderCfgs {
-		if provider, err := storage.New(storageProviderCfg); err != nil {
+		if provider, err := providers.New(storageProviderCfg); err != nil {
 			return nil, fmt.Errorf("failed initializing storage provider %s: %w", providerName, err)
 		} else {
 			storageProviders[providerName] = provider

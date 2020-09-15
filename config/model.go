@@ -1,10 +1,9 @@
 package config
 
 import (
+	"github.com/zinic/forculus/eventserver"
 	"regexp"
 	"time"
-
-	"github.com/zinic/forculus/eventserver/event"
 )
 
 type StorageProviderType string
@@ -20,7 +19,6 @@ type EventServerConfig struct {
 	RecordKeepers    map[string]RecordKeeperClient
 	SMTPServers      map[string]SMTPServer
 	EmailAlerts      map[string]EmailAlert
-	Emailers         map[string]Emailer
 }
 
 type Uploader struct {
@@ -34,7 +32,7 @@ type EmailAlert struct {
 }
 
 type AlertFilter struct {
-	EventTrigger        event.Type
+	EventTrigger        eventserver.EventType
 	NameRegex           *regexp.Regexp
 	AlertFrameThreshold int
 	EventTimeAfter      time.Time

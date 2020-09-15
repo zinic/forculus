@@ -1,16 +1,14 @@
-package logic
+package actors
 
 import (
+	"github.com/zinic/forculus/eventserver"
 	"time"
 
-	"github.com/zinic/forculus/eventserver/actor"
-
-	"github.com/zinic/forculus/eventserver/event"
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/zoneminder/zmapi"
 )
 
-func RegisterMonitorEventWatch(reactor actor.Reactor, client zmapi.Client) {
+func RegisterMonitorEventWatch(reactor eventserver.SubscriptionManager, client zmapi.Client) {
 	watcher := &MonitorEventWatch{
 		watchedMonitors: make(map[string]time.Time),
 		seenEvents:      make(map[string]time.Time),
@@ -19,13 +17,13 @@ func RegisterMonitorEventWatch(reactor actor.Reactor, client zmapi.Client) {
 	}
 	watcher.loadMostRecentEvents()
 
-	reactor.Register(actor.NewSubscriber(watcher.Logic), event.MonitorExitingAlert)
+	reactor.Register(watcher.Logic, eventserver.MonitorExitingAlert)
 }
 
 type MonitorEventWatch struct {
 	watchedMonitors map[string]time.Time
 	seenEvents      map[string]time.Time
-	dispatcher      actor.Dispatch
+	dispatcher      eventserver.EventDispatch
 	client          zmapi.Client
 }
 
@@ -73,7 +71,7 @@ func (s *MonitorEventWatch) cleanupSeenEvents() {
 	}
 }
 
-func (s *MonitorEventWatch) Logic(eventC chan event.Event, exitC chan struct{}) {
+func (s *MonitorEventWatch) Logic(eventC <-chan eventserver.Event, exitC chan struct{}) {
 	const (
 		scanInterval = time.Second * 2
 		searchWindow = -time.Second * 30
@@ -99,8 +97,8 @@ func (s *MonitorEventWatch) Logic(eventC chan event.Event, exitC chan struct{}) 
 						if _, seen := s.seenEvents[monitorEvent.ID]; !seen {
 							delete(s.watchedMonitors, monitorID)
 
-							s.dispatcher.Dispatch(event.Event{
-								Type:    event.NewMonitorEvent,
+							s.dispatcher.Send(eventserver.Event{
+								Type:    eventserver.MonitorNewEvent,
 								Payload: monitorEvent,
 							})
 
