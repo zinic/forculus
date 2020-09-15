@@ -50,7 +50,7 @@ func (s *Handler) GetEvent(resp ResponseWrapper, req *http.Request) {
 	vars := mux.Vars(req)
 	rawEventRecordID := vars[eventIDVarKey]
 
-	if eventRecordID, err := strconv.ParseUint(rawEventRecordID, 10, 64); err != nil {
+	if eventRecordID, err := strconv.ParseInt(rawEventRecordID, 10, 64); err != nil {
 		resp.Errorf(http.StatusBadRequest, "malformed event ID %s", rawEventRecordID)
 	} else if accessTokenValues, hasToken := req.URL.Query()[EventAccessTokenKey]; !hasToken {
 		resp.Error(http.StatusUnauthorized, "no access token specified")

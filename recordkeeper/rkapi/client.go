@@ -27,8 +27,8 @@ func NewClient(credentials Credentials, endpoint apitools.Endpoint) Client {
 }
 
 type Client interface {
-	CreateEventRecord(req rkdb.CreateEventRecord) (uint64, error)
-	FormatEventURL(id uint64, accessToken string) string
+	CreateEventRecord(req rkdb.CreateEventRecord) (int64, error)
+	FormatEventURL(id int64, accessToken string) string
 }
 
 type recordKeeperClient struct {
@@ -46,7 +46,7 @@ func (s *recordKeeperClient) authHeaderValue() string {
 	return authHash
 }
 
-func (s *recordKeeperClient) FormatEventURL(id uint64, accessToken string) string {
+func (s *recordKeeperClient) FormatEventURL(id int64, accessToken string) string {
 	query := url.Values{
 		server.EventAccessTokenKey: []string{accessToken},
 	}
@@ -54,7 +54,7 @@ func (s *recordKeeperClient) FormatEventURL(id uint64, accessToken string) strin
 	return s.httpClient.Endpoint.FormatQuery(query, "event", fmt.Sprintf("%d", id))
 }
 
-func (s *recordKeeperClient) CreateEventRecord(req rkdb.CreateEventRecord) (uint64, error) {
+func (s *recordKeeperClient) CreateEventRecord(req rkdb.CreateEventRecord) (int64, error) {
 	headers := http.Header{
 		server.AuthorizationHeaderKey: []string{s.authHeaderValue()},
 	}

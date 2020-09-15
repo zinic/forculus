@@ -1,6 +1,7 @@
 package rkdb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -16,28 +17,31 @@ const (
 	eventRecordKey   = "events.id_%d"
 )
 
-func formatRecordKey(id uint64) []byte {
+func formatRecordKey(id int64) []byte {
 	return []byte(fmt.Sprintf(eventRecordKey, id))
 }
 
-func nextEventID(txn *badger.Txn) (uint64, error) {
+func nextEventID(txn *badger.Txn) (int64, error) {
 	var (
-		value            = make([]byte, 8)
-		currentID uint64 = 0
+		currentID int64 = 0
+		value           = make([]byte, 8)
+		item, err       = txn.Get([]byte(eventRecordIDKey))
 	)
 
-	if item, err := txn.Get([]byte(eventRecordIDKey)); err != nil {
+	if err != nil {
 		if err != badger.ErrKeyNotFound {
 			return 0, err
 		}
 	} else if _, err := item.ValueCopy(value); err != nil {
 		return 0, err
+	} else if readID, err := binary.ReadVarint(bytes.NewBuffer(value)); err != nil {
+		return 0, err
 	} else {
-		currentID = binary.LittleEndian.Uint64(value)
+		currentID = readID
 	}
 
 	currentID += 1
-	binary.LittleEndian.PutUint64(value, currentID)
+	binary.PutVarint(value, currentID)
 
 	return currentID, txn.Set([]byte(eventRecordIDKey), value)
 }
@@ -60,7 +64,7 @@ func (s *Database) Close() error {
 	return s.db.Close()
 }
 
-func (s *Database) WriteEventRecord(record EventRecord) (uint64, error) {
+func (s *Database) WriteEventRecord(record EventRecord) (int64, error) {
 	txn := s.db.NewTransaction(true)
 	defer txn.Discard()
 
@@ -79,7 +83,7 @@ func (s *Database) WriteEventRecord(record EventRecord) (uint64, error) {
 	}
 }
 
-func (s *Database) GetEventRecord(id uint64) (EventRecord, error) {
+func (s *Database) GetEventRecord(id int64) (EventRecord, error) {
 	var (
 		txn    = s.db.NewTransaction(false)
 		record EventRecord
