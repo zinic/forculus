@@ -3,9 +3,10 @@ package server
 import (
 	"crypto/sha256"
 	"fmt"
-	"github.com/zinic/forculus/config"
 	"net/http"
 	"strings"
+
+	"github.com/zinic/forculus/config"
 )
 
 const (

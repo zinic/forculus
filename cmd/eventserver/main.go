@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+
 	"github.com/zinic/forculus/eventserver"
 	"github.com/zinic/forculus/eventserver/services"
 
@@ -42,7 +43,7 @@ func start(cfg config.EventServerConfig) error {
 			)
 
 			reactor.Register(uploader, eventserver.MonitorNewEvent)
-			
+
 			log.Debugf("New uploader %s registered to upload to storage provider %s", uploaderName, uploaderCfg.StorageTarget)
 		}
 

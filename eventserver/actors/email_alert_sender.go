@@ -2,6 +2,7 @@ package actors
 
 import (
 	"fmt"
+
 	"github.com/zinic/forculus/eventserver"
 
 	"github.com/zinic/forculus/config"

@@ -2,10 +2,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/zinic/forculus/storage/providers"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/zinic/forculus/storage/providers"
 
 	"github.com/zinic/forculus/apitools"
 

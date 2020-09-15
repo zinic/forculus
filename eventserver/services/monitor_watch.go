@@ -1,10 +1,11 @@
 package services
 
 import (
-	"github.com/zinic/forculus/eventserver"
-	"github.com/zinic/forculus/service"
 	"sync"
 	"time"
+
+	"github.com/zinic/forculus/eventserver"
+	"github.com/zinic/forculus/service"
 
 	"github.com/zinic/forculus/log"
 

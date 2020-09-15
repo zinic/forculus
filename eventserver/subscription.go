@@ -1,8 +1,9 @@
 package eventserver
 
 import (
-	"github.com/zinic/forculus/log"
 	"sync"
+
+	"github.com/zinic/forculus/log"
 )
 
 const (

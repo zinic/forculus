@@ -1,8 +1,9 @@
 package storage
 
 import (
-	"github.com/zinic/forculus/config"
 	"io"
+
+	"github.com/zinic/forculus/config"
 )
 
 type Provider interface {

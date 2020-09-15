@@ -3,15 +3,16 @@ package server
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/zinic/forculus/cmd"
-	"github.com/zinic/forculus/log"
-	"github.com/zinic/forculus/storage"
 	"io"
 	"io/ioutil"
 	"mime"
 	"net/http"
 	"strconv"
+
+	"github.com/gorilla/mux"
+	"github.com/zinic/forculus/cmd"
+	"github.com/zinic/forculus/log"
+	"github.com/zinic/forculus/storage"
 
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/recordkeeper/rkdb"

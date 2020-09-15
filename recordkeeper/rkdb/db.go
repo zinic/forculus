@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+
 	"github.com/zinic/forculus/errors"
 
 	"github.com/dgraph-io/badger/v2"

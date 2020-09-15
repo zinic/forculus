@@ -1,8 +1,9 @@
 package actors
 
 import (
-	"github.com/zinic/forculus/eventserver"
 	"time"
+
+	"github.com/zinic/forculus/eventserver"
 
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/zoneminder/zmapi"

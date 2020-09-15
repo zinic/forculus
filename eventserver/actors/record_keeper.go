@@ -1,13 +1,14 @@
 package actors
 
 import (
+	"math/rand"
+
 	"github.com/zinic/forculus/apitools"
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/eventserver"
 	"github.com/zinic/forculus/log"
 	"github.com/zinic/forculus/recordkeeper/rkapi"
 	"github.com/zinic/forculus/recordkeeper/rkdb"
-	"math/rand"
 )
 
 const (

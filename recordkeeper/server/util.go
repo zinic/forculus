@@ -2,8 +2,9 @@ package server
 
 import (
 	"fmt"
-	"github.com/zinic/forculus/log"
 	"net/http"
+
+	"github.com/zinic/forculus/log"
 )
 
 type ResponseWrapper interface {

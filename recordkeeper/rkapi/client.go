@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/zinic/forculus/recordkeeper/rkdb"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/zinic/forculus/recordkeeper/rkdb"
 
 	"github.com/zinic/forculus/apitools"
 	"github.com/zinic/forculus/recordkeeper/server"

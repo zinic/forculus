@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+
 	"github.com/zinic/forculus/eventserver"
 )
 
@@ -37,11 +38,11 @@ type Zoneminder struct {
 }
 
 type RecordKeeperClient struct {
-	Scheme     string   `toml:"scheme"`
-	Host       string   `toml:"host"`
-	Port       int      `toml:"port"`
-	Username   string   `toml:"username"`
-	Password   string   `toml:"password"`
+	Scheme   string `toml:"scheme"`
+	Host     string `toml:"host"`
+	Port     int    `toml:"port"`
+	Username string `toml:"username"`
+	Password string `toml:"password"`
 }
 
 type SMTPServer struct {

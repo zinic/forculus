@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/zinic/forculus/eventserver"
 	"regexp"
 	"time"
+
+	"github.com/zinic/forculus/eventserver"
 )
 
 type StorageProviderType string

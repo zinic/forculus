@@ -2,6 +2,7 @@ package providers
 
 import (
 	"fmt"
+
 	"github.com/zinic/forculus/config"
 	"github.com/zinic/forculus/storage"
 	"github.com/zinic/forculus/storage/providers/aws"
